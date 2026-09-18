@@ -5,6 +5,15 @@ changes from every other rule are left untouched.
 
 Requires ESLint 9 or newer and Node.js 18.18 or newer.
 
+| ESLint | Node.js |
+| --- | --- |
+| 9 | `>=18.18.0` |
+| 10+ | `^20.19.0 || ^22.13.0 || >=24` |
+
+If ESLint 10 is installed on an older Node.js, or the project has no flat config
+file (`eslint.config.js` / `.mjs` / `.cjs`), the CLI exits with code `2` and a
+concrete message instead of an ESLint stack trace. `.eslintrc.*` is not read.
+
 ## Installation
 
 Install the package next to ESLint in your project:

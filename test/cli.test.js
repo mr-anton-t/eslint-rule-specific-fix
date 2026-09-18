@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -8,7 +9,9 @@ import { promisify } from 'node:util';
 import test from 'node:test';
 
 const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
 const cliPath = path.resolve('bin/eslint-rule-specific-fix.js');
+const installedEslintMajor = Number.parseInt(require('eslint/package.json').version.split('.')[0], 10);
 
 async function createFixture(source, rules) {
     const directory = await mkdtemp(path.join(tmpdir(), 'eslint-rule-specific-fix-'));
@@ -149,6 +152,52 @@ test('prints upgrade instructions before loading ESLint on unsupported Node.js',
             assert.match(error.stderr, /Current version: v16\.20\.2/);
             assert.match(error.stderr, /Please upgrade Node\.js and run the command again/);
             assert.match(error.stderr, /Supported versions: Node\.js >=18\.18\.0/);
+            return true;
+        },
+    );
+});
+
+test('explains that ESLint 10 cannot run on Node.js 18', { skip: installedEslintMajor < 10 }, async () => {
+    const cliUrl = pathToFileURL(cliPath).href;
+    const script = `
+        Object.defineProperty(process.versions, 'node', { value: '18.18.2' });
+        Object.defineProperty(process, 'version', { value: 'v18.18.2' });
+        await import(${JSON.stringify(cliUrl)});
+    `;
+
+    await assert.rejects(
+        execFileAsync(
+            process.execPath,
+            ['--input-type=module', '--eval', script],
+        ),
+        error => {
+            assert.equal(error.code, 2);
+            assert.match(error.stderr, /ESLint .+ requires Node\.js \^20\.19\.0 \|\| \^22\.13\.0 \|\| >=24\.0\.0/);
+            assert.match(error.stderr, /Current version: v18\.18\.2/);
+            assert.match(error.stderr, /ESLint 10 dropped support for Node\.js 18/);
+            assert.match(error.stderr, /use ESLint 9 with Node\.js >=18\.18\.0/);
+            assert.doesNotMatch(error.stderr, /unexpected error/);
+            return true;
+        },
+    );
+});
+
+test('explains when a flat config file is missing', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'eslint-rule-specific-fix-noconfig-'));
+    await writeFile(path.join(directory, 'fixture.js'), 'const value = 1;\n');
+
+    await assert.rejects(
+        execFileAsync(
+            process.execPath,
+            [cliPath, '--rule', 'semi', 'fixture.js'],
+            { cwd: directory },
+        ),
+        error => {
+            assert.equal(error.code, 2);
+            assert.match(error.stderr, /could not find a flat config file/i);
+            assert.match(error.stderr, /eslint\.config\.js/);
+            assert.match(error.stderr, /no longer reads \.eslintrc/);
+            assert.doesNotMatch(error.stderr, /unexpected error/);
             return true;
         },
     );
