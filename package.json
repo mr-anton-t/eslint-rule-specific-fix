@@ -1,6 +1,6 @@
 {
   "name": "eslint-rule-specific-fix",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Apply ESLint fixes only for explicitly selected rules",
   "type": "module",
   "bin": {
