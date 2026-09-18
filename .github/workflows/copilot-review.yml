@@ -1,0 +1,51 @@
+name: Copilot Review
+
+# workflow_run provides write access even when the tested pull request comes
+# from a fork. This workflow never checks out or executes pull request code.
+on:
+  workflow_run:
+    workflows:
+      - Test
+    types:
+      - completed
+
+permissions:
+  pull-requests: write
+
+jobs:
+  request-review:
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.pull_requests[0].number != null
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Request Copilot review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          draft=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" --jq '.draft')
+
+          if [ "$draft" = "true" ]; then
+            echo "Skipping Copilot review for draft pull request."
+            exit 0
+          fi
+
+          requested=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER/requested_reviewers" \
+            --jq 'any(.users[].login | ascii_downcase; . == "copilot" or . == "copilot-pull-request-reviewer[bot]")')
+          reviewed=$(gh api --paginate "repos/$REPOSITORY/pulls/$PR_NUMBER/reviews?per_page=100" \
+            | jq -s 'any(.[][]; .user.login == "copilot-pull-request-reviewer[bot]")')
+
+          if [ "$requested" = "true" ] || [ "$reviewed" = "true" ]; then
+            echo "Copilot is already requested or has reviewed this pull request."
+            exit 0
+          fi
+
+          gh api --method POST \
+            "repos/$REPOSITORY/pulls/$PR_NUMBER/requested_reviewers" \
+            -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
