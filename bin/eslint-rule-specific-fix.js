@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-import { ESLint } from 'eslint';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const packageJson = require('../package.json');
+const minimumNodeVersion = '18.18.0';
 
 const usage = `Usage: eslint-rule-specific-fix --rule <rule> [--rule <rule> ...] <files...>
 
@@ -102,6 +102,7 @@ async function main() {
         return;
     }
 
+    const { ESLint } = await import('eslint');
     const eslint = new ESLint({
         fix: message => options.rules.has(message.ruleId),
     });
@@ -131,7 +132,34 @@ async function main() {
     }
 }
 
-main().catch(error => {
-    console.error(error.message);
+function supportsNodeVersion(version) {
+    const [major, minor] = version.split('.').map(Number);
+
+    return major > 18 || (major === 18 && minor >= 18);
+}
+
+function reportUnexpectedError(error) {
+    const details = error instanceof Error ? error.stack ?? error.message : String(error);
+
+    console.error(details);
+    console.error(
+        '\neslint-rule-specific-fix encountered an unexpected error.\n' +
+        'Please report this issue:\n' +
+        'https://github.com/mr-anton-t/eslint-rule-specific-fix/issues/new\n\n' +
+        'AI-generated issue reports are welcome.\n' +
+        'A reproducible example and the complete error log are required.',
+    );
     process.exitCode = 2;
-});
+}
+
+if (!supportsNodeVersion(process.versions.node)) {
+    console.error(
+        `Error: eslint-rule-specific-fix requires Node.js >=${minimumNodeVersion}\n` +
+        `Current version: ${process.version}\n\n` +
+        'Please upgrade Node.js and run the command again.\n' +
+        `Supported versions: Node.js >=${minimumNodeVersion}`,
+    );
+    process.exitCode = 2;
+} else {
+    main().catch(reportUnexpectedError);
+}
