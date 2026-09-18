@@ -3,11 +3,16 @@
   "version": "1.0.1",
   "description": "Apply ESLint fixes only for explicitly selected rules",
   "type": "module",
+  "exports": {
+    ".": "./index.js"
+  },
   "bin": {
     "eslint-rule-specific-fix": "bin/eslint-rule-specific-fix.js"
   },
   "files": [
-    "bin"
+    "bin",
+    "lib",
+    "index.js"
   ],
   "scripts": {
     "lint": "eslint .",
@@ -18,7 +23,8 @@
     "eslint9",
     "eslint10",
     "fix",
-    "cli"
+    "cli",
+    "api"
   ],
   "author": "Anton T",
   "license": "MIT",
