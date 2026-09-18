@@ -1,0 +1,32 @@
+{
+  "name": "eslint-rule-specific-fix",
+  "version": "1.0.0",
+  "description": "Apply ESLint fixes only for explicitly selected rules",
+  "type": "module",
+  "bin": {
+    "eslint-rule-specific-fix": "bin/eslint-rule-specific-fix.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "eslint",
+    "eslint9",
+    "fix",
+    "cli"
+  ],
+  "author": "Anton T",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "peerDependencies": {
+    "eslint": ">=9.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  }
+}
