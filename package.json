@@ -22,6 +22,14 @@
   ],
   "author": "Anton T",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mr-anton-t/eslint-rule-specific-fix.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mr-anton-t/eslint-rule-specific-fix/issues"
+  },
+  "homepage": "https://github.com/mr-anton-t/eslint-rule-specific-fix#readme",
   "engines": {
     "node": ">=18.18.0"
   },
