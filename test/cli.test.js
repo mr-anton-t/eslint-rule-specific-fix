@@ -72,6 +72,26 @@ test('returns 1 when a selected rule cannot be fixed', async () => {
     );
 });
 
+test('returns 2 for fatal ESLint diagnostics', async () => {
+    const directory = await createFixture('const value = ;\n', {
+        semi: ['error', 'always'],
+    });
+
+    await assert.rejects(
+        execFileAsync(
+            process.execPath,
+            [cliPath, '--rule', 'semi', 'fixture.js'],
+            { cwd: directory },
+        ),
+        error => {
+            assert.equal(error.code, 2);
+            assert.match(error.stderr, /Parsing error/);
+            return true;
+        },
+    );
+    assert.equal(await readFile(path.join(directory, 'fixture.js'), 'utf8'), 'const value = ;\n');
+});
+
 test('returns 2 for invalid arguments', async () => {
     await assert.rejects(
         execFileAsync(process.execPath, [cliPath, '--rule']),
