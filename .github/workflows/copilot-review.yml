@@ -36,16 +36,20 @@ jobs:
             exit 0
           fi
 
-          requested=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER/requested_reviewers" \
-            --jq 'any(.users[].login | ascii_downcase; . == "copilot" or . == "copilot-pull-request-reviewer[bot]")')
-          reviewed=$(gh api --paginate "repos/$REPOSITORY/pulls/$PR_NUMBER/reviews?per_page=100" \
-            | jq -s 'any(.[][]; .user.login == "copilot-pull-request-reviewer[bot]")')
+          pull_request_id=$(gh pr view "$PR_NUMBER" \
+            --repo "$REPOSITORY" \
+            --json id \
+            --jq '.id')
 
-          if [ "$requested" = "true" ] || [ "$reviewed" = "true" ]; then
-            echo "Copilot is already requested or has reviewed this pull request."
-            exit 0
-          fi
-
-          gh api --method POST \
-            "repos/$REPOSITORY/pulls/$PR_NUMBER/requested_reviewers" \
-            -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
+          gh api graphql \
+            -F pullRequestId="$pull_request_id" \
+            -f 'botLogins[]=copilot-pull-request-reviewer[bot]' \
+            -f query='mutation($pullRequestId: ID!, $botLogins: [String!]) {
+              requestReviewsByLogin(input: {
+                pullRequestId: $pullRequestId,
+                botLogins: $botLogins,
+                union: true
+              }) {
+                clientMutationId
+              }
+            }'

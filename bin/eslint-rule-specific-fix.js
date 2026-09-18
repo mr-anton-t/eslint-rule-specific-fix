@@ -62,6 +62,24 @@ function parseArguments(args) {
     return { action: 'lint', files, rules };
 }
 
+function filterResults(results, predicate) {
+    return results
+        .map(result => {
+            const messages = result.messages.filter(predicate);
+
+            return {
+                ...result,
+                messages,
+                errorCount: messages.filter(message => message.severity === 2).length,
+                warningCount: messages.filter(message => message.severity === 1).length,
+                fatalErrorCount: messages.filter(message => message.fatal).length,
+                fixableErrorCount: messages.filter(message => message.severity === 2 && message.fix).length,
+                fixableWarningCount: messages.filter(message => message.severity === 1 && message.fix).length,
+            };
+        })
+        .filter(result => result.messages.length > 0);
+}
+
 async function main() {
     let options;
 
@@ -91,25 +109,24 @@ async function main() {
 
     await ESLint.outputFixes(results);
 
-    const remainingResults = results
-        .map(result => {
-            const messages = result.messages.filter(message => options.rules.has(message.ruleId));
+    const hasFatalMessage = results.some(result =>
+        result.messages.some(message => message.fatal),
+    );
+    const reportableResults = filterResults(
+        results,
+        message => message.fatal || options.rules.has(message.ruleId),
+    );
 
-            return {
-                ...result,
-                messages,
-                errorCount: messages.filter(message => message.severity === 2).length,
-                warningCount: messages.filter(message => message.severity === 1).length,
-                fatalErrorCount: messages.filter(message => message.fatal).length,
-                fixableErrorCount: messages.filter(message => message.severity === 2 && message.fix).length,
-                fixableWarningCount: messages.filter(message => message.severity === 1 && message.fix).length,
-            };
-        })
-        .filter(result => result.messages.length > 0);
-
-    if (remainingResults.length > 0) {
+    if (hasFatalMessage) {
         const formatter = await eslint.loadFormatter('stylish');
-        console.error(await formatter.format(remainingResults));
+        console.error(await formatter.format(reportableResults));
+        process.exitCode = 2;
+        return;
+    }
+
+    if (reportableResults.length > 0) {
+        const formatter = await eslint.loadFormatter('stylish');
+        console.error(await formatter.format(reportableResults));
         process.exitCode = 1;
     }
 }
