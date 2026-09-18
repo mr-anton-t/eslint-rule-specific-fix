@@ -10,11 +10,13 @@
     "bin"
   ],
   "scripts": {
+    "lint": "eslint .",
     "test": "node --test"
   },
   "keywords": [
     "eslint",
     "eslint9",
+    "eslint10",
     "fix",
     "cli"
   ],
@@ -27,6 +29,6 @@
     "eslint": ">=9.0.0"
   },
   "devDependencies": {
-    "eslint": "^9.0.0"
+    "eslint": "^10.0.0"
   }
 }

@@ -5,7 +5,20 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    name: ESLint 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
   test:
+    name: Node ${{ matrix.node-version }} / ESLint ${{ matrix.eslint-version }}
     runs-on: ubuntu-latest
     strategy:
       matrix:

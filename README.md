@@ -45,6 +45,16 @@ Use `--` before a file pattern beginning with a hyphen.
 
 Violations from rules not passed to `--rule` do not affect the exit code.
 
+## Development
+
+Development uses ESLint 10 and therefore requires Node.js 20.19 or newer.
+
+```sh
+npm ci
+npm run lint
+npm test
+```
+
 ## License
 
 MIT
