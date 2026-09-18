@@ -1,7 +1,7 @@
 name: Copilot Review
 
 # Copilot assignment and reassignment rules:
-# - Wait for the entire Test workflow, including every test matrix and lint job.
+# - Wait for the entire Quality workflow: lint, package, and every test job.
 # - Assign Copilot after the first successful pull request run.
 # - Reassign Copilot after later successful runs to review new commits.
 # - Never assign on failed/cancelled checks, push runs, or draft pull requests.
@@ -9,7 +9,7 @@ name: Copilot Review
 on:
   workflow_run:
     workflows:
-      - Test
+      - Quality
     types:
       - completed
 
