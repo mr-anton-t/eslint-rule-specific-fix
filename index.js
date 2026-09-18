@@ -3,6 +3,7 @@ export {
     assertEslintCompatibility,
     assertToolNodeVersion,
     formatMissingFlatConfigError,
+    isExpectedCompatibilityError,
     isMissingFlatConfigError,
     normalizeRuntimeError,
 } from './lib/runtime.js';
