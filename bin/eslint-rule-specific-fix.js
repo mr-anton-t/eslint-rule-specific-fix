@@ -109,23 +109,24 @@ async function main() {
 
     await ESLint.outputFixes(results);
 
-    const fatalResults = filterResults(results, message => message.fatal);
+    const hasFatalMessage = results.some(result =>
+        result.messages.some(message => message.fatal),
+    );
+    const reportableResults = filterResults(
+        results,
+        message => message.fatal || options.rules.has(message.ruleId),
+    );
 
-    if (fatalResults.length > 0) {
+    if (hasFatalMessage) {
         const formatter = await eslint.loadFormatter('stylish');
-        console.error(await formatter.format(fatalResults));
+        console.error(await formatter.format(reportableResults));
         process.exitCode = 2;
         return;
     }
 
-    const remainingResults = filterResults(
-        results,
-        message => options.rules.has(message.ruleId),
-    );
-
-    if (remainingResults.length > 0) {
+    if (reportableResults.length > 0) {
         const formatter = await eslint.loadFormatter('stylish');
-        console.error(await formatter.format(remainingResults));
+        console.error(await formatter.format(reportableResults));
         process.exitCode = 1;
     }
 }
