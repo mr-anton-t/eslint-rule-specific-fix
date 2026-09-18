@@ -1,7 +1,11 @@
 name: Copilot Review
 
-# workflow_run provides write access even when the tested pull request comes
-# from a fork. This workflow never checks out or executes pull request code.
+# Copilot assignment and reassignment rules:
+# - Wait for the entire Test workflow, including every test matrix and lint job.
+# - Assign Copilot after the first successful pull request run.
+# - Reassign Copilot after later successful runs to review new commits.
+# - Never assign on failed/cancelled checks, push runs, or draft pull requests.
+# workflow_run provides write access for fork PRs. No PR code is executed here.
 on:
   workflow_run:
     workflows:
