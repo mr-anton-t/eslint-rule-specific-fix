@@ -118,6 +118,7 @@ test('prints the original error and package support message for runtime errors',
         error => {
             assert.equal(error.code, 2);
             assert.match(error.stderr, /No files matching/);
+            assert.match(error.stderr, /\n {4}at .+\n/);
             assert.match(error.stderr, /eslint-rule-specific-fix encountered an unexpected error/);
             assert.match(error.stderr, /github\.com\/mr-anton-t\/eslint-rule-specific-fix\/issues\/new/);
             assert.match(error.stderr, /AI-generated issue reports are welcome/);
@@ -129,6 +130,7 @@ test('prints the original error and package support message for runtime errors',
 
 test('prints upgrade instructions before loading ESLint on unsupported Node.js', async () => {
     const cliUrl = pathToFileURL(cliPath).href;
+    const loaderUrl = pathToFileURL(path.resolve('test-support/reject-eslint-loader.mjs')).href;
     const script = `
         Object.defineProperty(process.versions, 'node', { value: '16.20.2' });
         Object.defineProperty(process, 'version', { value: 'v16.20.2' });
@@ -136,9 +138,13 @@ test('prints upgrade instructions before loading ESLint on unsupported Node.js',
     `;
 
     await assert.rejects(
-        execFileAsync(process.execPath, ['--input-type=module', '--eval', script]),
+        execFileAsync(
+            process.execPath,
+            ['--experimental-loader', loaderUrl, '--input-type=module', '--eval', script],
+        ),
         error => {
             assert.equal(error.code, 2);
+            assert.doesNotMatch(error.stderr, /ESLint was loaded before/);
             assert.match(error.stderr, /requires Node\.js >=18\.18\.0/);
             assert.match(error.stderr, /Current version: v16\.20\.2/);
             assert.match(error.stderr, /Please upgrade Node\.js and run the command again/);
