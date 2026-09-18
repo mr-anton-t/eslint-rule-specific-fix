@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import test from 'node:test';
 
@@ -100,6 +101,48 @@ test('returns 2 for invalid arguments', async () => {
         error => {
             assert.equal(error.code, 2);
             assert.match(error.stderr, /requires a rule ID/);
+            return true;
+        },
+    );
+});
+
+test('prints the original error and package support message for runtime errors', async () => {
+    const directory = await createFixture('const value = 1;\n', {});
+
+    await assert.rejects(
+        execFileAsync(
+            process.execPath,
+            [cliPath, '--rule', 'semi', 'missing.js'],
+            { cwd: directory },
+        ),
+        error => {
+            assert.equal(error.code, 2);
+            assert.match(error.stderr, /No files matching/);
+            assert.match(error.stderr, /eslint-rule-specific-fix encountered an unexpected error/);
+            assert.match(error.stderr, /github\.com\/mr-anton-t\/eslint-rule-specific-fix\/issues\/new/);
+            assert.match(error.stderr, /AI-generated issue reports are welcome/);
+            assert.match(error.stderr, /A reproducible example and the complete error log are required/);
+            return true;
+        },
+    );
+});
+
+test('prints upgrade instructions before loading ESLint on unsupported Node.js', async () => {
+    const cliUrl = pathToFileURL(cliPath).href;
+    const script = `
+        Object.defineProperty(process.versions, 'node', { value: '16.20.2' });
+        Object.defineProperty(process, 'version', { value: 'v16.20.2' });
+        await import(${JSON.stringify(cliUrl)});
+    `;
+
+    await assert.rejects(
+        execFileAsync(process.execPath, ['--input-type=module', '--eval', script]),
+        error => {
+            assert.equal(error.code, 2);
+            assert.match(error.stderr, /requires Node\.js >=18\.18\.0/);
+            assert.match(error.stderr, /Current version: v16\.20\.2/);
+            assert.match(error.stderr, /Please upgrade Node\.js and run the command again/);
+            assert.match(error.stderr, /Supported versions: Node\.js >=18\.18\.0/);
             return true;
         },
     );
