@@ -62,7 +62,7 @@ function readInstalledEslintVersion() {
     }
 }
 
-function assertRuntimeCompatibility() {
+function assertToolNodeVersion() {
     if (!supportsNodeVersion(process.versions.node)) {
         throw new Error(
             `Error: eslint-rule-specific-fix requires Node.js >=${minimumNodeVersion}\n` +
@@ -71,7 +71,9 @@ function assertRuntimeCompatibility() {
             `Supported versions: Node.js >=${minimumNodeVersion}`,
         );
     }
+}
 
+function assertEslintCompatibility() {
     const eslintVersion = readInstalledEslintVersion();
     const { major } = parseVersion(eslintVersion);
 
@@ -184,6 +186,13 @@ async function main() {
         return;
     }
 
+    try {
+        assertEslintCompatibility();
+    } catch (error) {
+        reportExpectedRuntimeError(error);
+        return;
+    }
+
     const { ESLint } = await import('eslint');
     const eslint = new ESLint({
         fix: message => options.rules.has(message.ruleId),
@@ -239,7 +248,7 @@ function reportUnexpectedError(error) {
 }
 
 try {
-    assertRuntimeCompatibility();
+    assertToolNodeVersion();
     main().catch(reportUnexpectedError);
 } catch (error) {
     reportExpectedRuntimeError(error);

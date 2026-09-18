@@ -162,6 +162,7 @@ test('explains that ESLint 10 cannot run on Node.js 18', { skip: installedEslint
     const script = `
         Object.defineProperty(process.versions, 'node', { value: '18.18.2' });
         Object.defineProperty(process, 'version', { value: 'v18.18.2' });
+        process.argv = [process.execPath, ${JSON.stringify(cliPath)}, '--rule', 'semi', 'fixture.js'];
         await import(${JSON.stringify(cliUrl)});
     `;
 
@@ -180,6 +181,25 @@ test('explains that ESLint 10 cannot run on Node.js 18', { skip: installedEslint
             return true;
         },
     );
+});
+
+
+test('prints help without checking the installed ESLint version', { skip: installedEslintMajor < 10 }, async () => {
+    const cliUrl = pathToFileURL(cliPath).href;
+    const script = `
+        Object.defineProperty(process.versions, 'node', { value: '18.18.2' });
+        Object.defineProperty(process, 'version', { value: 'v18.18.2' });
+        process.argv = [process.execPath, ${JSON.stringify(cliPath)}, '--help'];
+        await import(${JSON.stringify(cliUrl)});
+    `;
+
+    const result = await execFileAsync(
+        process.execPath,
+        ['--input-type=module', '--eval', script],
+    );
+
+    assert.match(result.stdout, /Usage: eslint-rule-specific-fix/);
+    assert.doesNotMatch(result.stderr, /ESLint .+ requires Node\.js/);
 });
 
 test('explains when a flat config file is missing', async () => {
