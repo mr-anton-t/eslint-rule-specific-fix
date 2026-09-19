@@ -36,6 +36,31 @@ test('fixRules applies only selected-rule fixes and returns a report', async () 
     );
 });
 
+test('fixRules accepts a single rule string', async () => {
+    const directory = await createFixture('const value = "text"\n', {
+        semi: ['error', 'always'],
+    });
+
+    const report = await fixRules('fixture.js', {
+        rules: 'semi',
+        cwd: directory,
+    });
+
+    assert.equal(report.exitCode, 0);
+    assert.deepEqual(report.rules, ['semi']);
+});
+
+test('fixRules rejects empty file patterns and character-split rules', async () => {
+    await assert.rejects(
+        fixRules(undefined, { rules: ['semi'] }),
+        /At least one file pattern is required/,
+    );
+    await assert.rejects(
+        fixRules([null], { rules: ['semi'] }),
+        /At least one file pattern is required/,
+    );
+});
+
 test('fixRules reports remaining selected-rule violations', async () => {
     const directory = await createFixture('debugger;\n', {
         'no-debugger': 'error',

@@ -4,7 +4,8 @@
   "description": "Apply ESLint fixes only for explicitly selected rules",
   "type": "module",
   "exports": {
-    ".": "./index.js"
+    ".": "./index.js",
+    "./package.json": "./package.json"
   },
   "bin": {
     "eslint-rule-specific-fix": "bin/eslint-rule-specific-fix.js"
