@@ -44,6 +44,27 @@ npx eslint-rule-specific-fix -r semi --rule=quotes "src/**/*.js"
 
 Use `--` before a file pattern beginning with a hyphen.
 
+## JS API
+
+The same selected-rule fixer can be called from Node.js. It uses the ESLint
+installed next to this package and writes fixes by default.
+
+```js
+import { fixRules } from 'eslint-rule-specific-fix';
+
+const report = await fixRules(['src/**/*.js'], {
+  rules: ['semi', 'quotes'],
+  cwd: process.cwd(),
+});
+
+if (report.exitCode !== 0) {
+  console.error(report.reportableResults);
+}
+```
+
+`report.exitCode` uses the same 0/1/2 meanings as the CLI. Pass `eslintOptions`
+through to the `ESLint` constructor when you need a custom config file or cwd.
+
 ## Exit codes
 
 | Code | Meaning |

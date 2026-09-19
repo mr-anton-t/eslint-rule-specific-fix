@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 
 import { createRequire } from 'node:module';
+import { fixRules } from '../lib/fix-rules.js';
+import {
+    assertToolNodeVersion,
+    normalizeRuntimeError,
+} from '../lib/runtime.js';
 
 const require = createRequire(import.meta.url);
 const packageJson = require('../package.json');
-const minimumNodeVersion = '18.18.0';
-const eslint10NodeRequirement = 'Node.js ^20.19.0 || ^22.13.0 || >=24.0.0';
 
 const usage = `Usage: eslint-rule-specific-fix --rule <rule> [--rule <rule> ...] <files...>
 
@@ -17,90 +20,7 @@ Options:
   -v, --version      Show the package version
   --                 Treat all remaining arguments as file patterns`;
 
-function parseVersion(version) {
-    const [major = 0, minor = 0, patch = 0] = String(version)
-        .replace(/^v/, '')
-        .split('.')
-        .map(part => Number.parseInt(part, 10) || 0);
-
-    return { major, minor, patch };
-}
-
-function supportsNodeVersion(version) {
-    const { major, minor } = parseVersion(version);
-
-    return major > 18 || (major === 18 && minor >= 18);
-}
-
-function supportsEslint10NodeVersion(version) {
-    const { major, minor } = parseVersion(version);
-
-    if (major === 20) {
-        return minor >= 19;
-    }
-
-    if (major === 22) {
-        return minor >= 13;
-    }
-
-    return major >= 24;
-}
-
-function readInstalledEslintVersion() {
-    try {
-        return require('eslint/package.json').version;
-    } catch (error) {
-        if (error.code === 'MODULE_NOT_FOUND') {
-            throw new Error(
-                'Error: ESLint is not installed next to eslint-rule-specific-fix.\n' +
-                'Install it in this project:\n\n' +
-                '    npm install --save-dev eslint',
-            );
-        }
-
-        throw error;
-    }
-}
-
-function assertToolNodeVersion() {
-    if (!supportsNodeVersion(process.versions.node)) {
-        throw new Error(
-            `Error: eslint-rule-specific-fix requires Node.js >=${minimumNodeVersion}\n` +
-            `Current version: ${process.version}\n\n` +
-            'Please upgrade Node.js and run the command again.\n' +
-            `Supported versions: Node.js >=${minimumNodeVersion}`,
-        );
-    }
-}
-
-function assertEslintCompatibility() {
-    const eslintVersion = readInstalledEslintVersion();
-    const { major } = parseVersion(eslintVersion);
-
-    if (major >= 10 && !supportsEslint10NodeVersion(process.versions.node)) {
-        throw new Error(
-            `Error: ESLint ${eslintVersion} requires ${eslint10NodeRequirement}.\n` +
-            `Current version: ${process.version}\n\n` +
-            'ESLint 10 dropped support for Node.js 18 and other unmaintained releases.\n' +
-            'Upgrade Node.js, or use ESLint 9 with Node.js >=18.18.0.',
-        );
-    }
-}
-
-function isMissingFlatConfigError(error) {
-    return error instanceof Error && error.message === 'Could not find config file.';
-}
-
-function formatMissingFlatConfigError() {
-    return (
-        'Error: ESLint could not find a flat config file (eslint.config.js, eslint.config.mjs, or eslint.config.cjs).\n' +
-        'ESLint 9+ uses flat config only; ESLint 10 no longer reads .eslintrc.* files.\n\n' +
-        'Add an eslint.config.js in the project root, or run the command from the directory that contains one.'
-    );
-}
-
-
-function parseArguments(args) {
+export function parseArguments(args) {
     const rules = new Set();
     const files = [];
     let positionalOnly = false;
@@ -146,24 +66,6 @@ function parseArguments(args) {
     return { action: 'lint', files, rules };
 }
 
-function filterResults(results, predicate) {
-    return results
-        .map(result => {
-            const messages = result.messages.filter(predicate);
-
-            return {
-                ...result,
-                messages,
-                errorCount: messages.filter(message => message.severity === 2).length,
-                warningCount: messages.filter(message => message.severity === 1).length,
-                fatalErrorCount: messages.filter(message => message.fatal).length,
-                fixableErrorCount: messages.filter(message => message.severity === 2 && message.fix).length,
-                fixableWarningCount: messages.filter(message => message.severity === 1 && message.fix).length,
-            };
-        })
-        .filter(result => result.messages.length > 0);
-}
-
 async function main() {
     let options;
 
@@ -186,41 +88,16 @@ async function main() {
         return;
     }
 
-    try {
-        assertEslintCompatibility();
-    } catch (error) {
-        reportExpectedRuntimeError(error);
-        return;
-    }
+    const report = await fixRules(options.files, { rules: options.rules });
 
-    const { ESLint } = await import('eslint');
-    const eslint = new ESLint({
-        fix: message => options.rules.has(message.ruleId),
-    });
-    const results = await eslint.lintFiles(options.files);
-
-    await ESLint.outputFixes(results);
-
-    const hasFatalMessage = results.some(result =>
-        result.messages.some(message => message.fatal),
-    );
-    const reportableResults = filterResults(
-        results,
-        message => message.fatal || options.rules.has(message.ruleId),
-    );
-
-    if (hasFatalMessage) {
+    if (report.reportableResults.length > 0) {
+        const { ESLint } = await import('eslint');
+        const eslint = new ESLint();
         const formatter = await eslint.loadFormatter('stylish');
-        console.error(await formatter.format(reportableResults));
-        process.exitCode = 2;
-        return;
+        console.error(await formatter.format(report.reportableResults));
     }
 
-    if (reportableResults.length > 0) {
-        const formatter = await eslint.loadFormatter('stylish');
-        console.error(await formatter.format(reportableResults));
-        process.exitCode = 1;
-    }
+    process.exitCode = report.exitCode;
 }
 
 function reportExpectedRuntimeError(error) {
@@ -229,8 +106,10 @@ function reportExpectedRuntimeError(error) {
 }
 
 function reportUnexpectedError(error) {
-    if (isMissingFlatConfigError(error)) {
-        reportExpectedRuntimeError(new Error(formatMissingFlatConfigError()));
+    const normalized = normalizeRuntimeError(error);
+
+    if (normalized !== error) {
+        reportExpectedRuntimeError(normalized);
         return;
     }
 
