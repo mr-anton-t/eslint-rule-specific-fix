@@ -44,6 +44,15 @@ npx eslint-rule-specific-fix -r semi --rule=quotes "src/**/*.js"
 
 Use `--` before a file pattern beginning with a hyphen.
 
+`--ext` limits directory scans to the given extensions (ignored for explicit
+file names and globs). `--ignore-pattern` adds extra ignore globs on top of the
+project config. `--stdin` reads a newline-separated file list from stdin:
+
+```sh
+npx eslint-rule-specific-fix --ext .js,.mjs --ignore-pattern 'vendor/**' --rule semi src
+git ls-files '*.js' | npx eslint-rule-specific-fix --stdin --rule semi
+```
+
 `--dry-run` computes the same selected-rule fixes without writing files.
 `--json` prints a machine-readable summary to stdout:
 
@@ -72,6 +81,7 @@ const report = await fixRules(['src/**/*.js'], {
   rules: ['semi', 'quotes'],
   cwd: process.cwd(),
   write: false,
+  ignorePatterns: ['vendor/**'],
 });
 
 console.log(report.summary);

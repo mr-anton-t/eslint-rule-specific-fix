@@ -3,6 +3,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { expandFilesWithExtensions, parseExtensions, parseStdinFileList } from '../lib/file-filters.js';
 import { fixRules } from '../index.js';
 
 async function createFixture(source, rules) {
@@ -79,6 +80,30 @@ test('fixRules can compute fixes without writing files', async () => {
     assert.equal(report.summary.written, false);
     assert.equal(report.summary.changedFileCount, 1);
     assert.equal(await readFile(path.join(directory, 'fixture.js'), 'utf8'), source);
+});
+
+test('fixRules honors extra ignore patterns', async () => {
+    const source = 'const value = 1\n';
+    const directory = await createFixture(source, {
+        semi: ['error', 'always'],
+    });
+    await writeFile(path.join(directory, 'skip.js'), source);
+
+    const report = await fixRules(['fixture.js', 'skip.js'], {
+        rules: 'semi',
+        cwd: directory,
+        ignorePatterns: ['skip.js'],
+    });
+
+    assert.equal(report.exitCode, 0);
+    assert.equal(await readFile(path.join(directory, 'fixture.js'), 'utf8'), 'const value = 1;\n');
+    assert.equal(await readFile(path.join(directory, 'skip.js'), 'utf8'), source);
+});
+
+test('parses extension and stdin file lists', () => {
+    assert.deepEqual(parseExtensions(['js,.mjs', '.cjs']), ['.js', '.mjs', '.cjs']);
+    assert.deepEqual(expandFilesWithExtensions(['src'], ['.js', '.mjs']), ['src/**/*{.js,.mjs}']);
+    assert.deepEqual(parseStdinFileList('a.js\n# comment\n\nb.js\n'), ['a.js', 'b.js']);
 });
 
 test('fixRules reports remaining selected-rule violations', async () => {
