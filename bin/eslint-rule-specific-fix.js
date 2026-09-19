@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
 import { createRequire } from 'node:module';
+import {
+    expandFilesWithExtensions,
+    parseExtensions,
+    parseStdinFileList,
+} from '../lib/file-filters.js';
 import { fixRules } from '../lib/fix-rules.js';
 import {
     assertToolNodeVersion,
@@ -10,24 +15,40 @@ import {
 const require = createRequire(import.meta.url);
 const packageJson = require('../package.json');
 
-const usage = `Usage: eslint-rule-specific-fix --rule <rule> [--rule <rule> ...] <files...>
+const usage = `Usage: eslint-rule-specific-fix --rule <rule> [--rule <rule> ...] [<files...>]
 
 Apply ESLint fixes only for the specified rules.
 
 Options:
-  -r, --rule <rule>  Rule ID whose fixes may be applied (repeatable)
-      --dry-run      Compute fixes without writing files
-      --json         Print a JSON summary to stdout
-  -h, --help         Show this help
-  -v, --version      Show the package version
-  --                 Treat all remaining arguments as file patterns`;
+  -r, --rule <rule>             Rule ID whose fixes may be applied (repeatable)
+      --ext <ext[,ext]>         Limit directory scans to these extensions
+      --ignore-pattern <glob>   Extra ignore glob (repeatable)
+      --stdin                   Read a newline-separated file list from stdin
+      --dry-run                 Compute fixes without writing files
+      --json                    Print a JSON summary to stdout
+  -h, --help                    Show this help
+  -v, --version                 Show the package version
+  --                            Treat all remaining arguments as file patterns`;
+
+function readOptionValue(argument, args, index) {
+    const value = args[index];
+
+    if (!value || value.startsWith('-')) {
+        throw new Error(`${argument} requires a value`);
+    }
+
+    return value;
+}
 
 export function parseArguments(args) {
     const rules = new Set();
     const files = [];
+    const extensions = [];
+    const ignorePatterns = [];
     let positionalOnly = false;
     let dryRun = false;
     let json = false;
+    let stdin = false;
 
     for (let index = 0; index < args.length; index++) {
         const argument = args[index];
@@ -37,13 +58,7 @@ export function parseArguments(args) {
         } else if (argument === '--') {
             positionalOnly = true;
         } else if (argument === '--rule' || argument === '-r') {
-            const rule = args[++index];
-
-            if (!rule || rule.startsWith('-')) {
-                throw new Error(`${argument} requires a rule ID`);
-            }
-
-            rules.add(rule);
+            rules.add(readOptionValue(argument, args, ++index));
         } else if (argument.startsWith('--rule=')) {
             const rule = argument.slice('--rule='.length);
 
@@ -52,6 +67,16 @@ export function parseArguments(args) {
             }
 
             rules.add(rule);
+        } else if (argument === '--ext') {
+            extensions.push(readOptionValue(argument, args, ++index));
+        } else if (argument.startsWith('--ext=')) {
+            extensions.push(argument.slice('--ext='.length));
+        } else if (argument === '--ignore-pattern') {
+            ignorePatterns.push(readOptionValue(argument, args, ++index));
+        } else if (argument.startsWith('--ignore-pattern=')) {
+            ignorePatterns.push(argument.slice('--ignore-pattern='.length));
+        } else if (argument === '--stdin') {
+            stdin = true;
         } else if (argument === '--dry-run') {
             dryRun = true;
         } else if (argument === '--json') {
@@ -67,11 +92,34 @@ export function parseArguments(args) {
         }
     }
 
-    if (rules.size === 0 || files.length === 0) {
+    if (rules.size === 0) {
         throw new Error('At least one rule and one file pattern are required');
     }
 
-    return { action: 'lint', files, rules, dryRun, json };
+    if (files.length === 0 && !stdin) {
+        throw new Error('At least one rule and one file pattern are required');
+    }
+
+    return {
+        action: 'lint',
+        files,
+        rules,
+        extensions: parseExtensions(extensions),
+        ignorePatterns,
+        dryRun,
+        json,
+        stdin,
+    };
+}
+
+async function readStdinFiles() {
+    const chunks = [];
+
+    for await (const chunk of process.stdin) {
+        chunks.push(chunk);
+    }
+
+    return parseStdinFileList(Buffer.concat(chunks).toString('utf8'));
 }
 
 async function main() {
@@ -96,9 +144,23 @@ async function main() {
         return;
     }
 
-    const report = await fixRules(options.files, {
+    const files = [...options.files];
+
+    if (options.stdin || files.includes('-')) {
+        const stdinFiles = await readStdinFiles();
+        const dashIndex = files.indexOf('-');
+
+        if (dashIndex >= 0) {
+            files.splice(dashIndex, 1, ...stdinFiles);
+        } else {
+            files.push(...stdinFiles);
+        }
+    }
+
+    const report = await fixRules(expandFilesWithExtensions(files, options.extensions), {
         rules: options.rules,
         write: !options.dryRun,
+        ignorePatterns: options.ignorePatterns,
     });
 
     if (options.json) {
