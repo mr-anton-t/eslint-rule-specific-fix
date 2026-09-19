@@ -5,16 +5,15 @@ on:
     types:
       - published
 
-permissions:
-  contents: read
-  id-token: write
-
 concurrency:
   group: release-${{ github.event.release.tag_name }}
   cancel-in-progress: false
 
 jobs:
-  publish:
+  publish-npm:
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -44,3 +43,31 @@ jobs:
 
       - name: Publish to npm
         run: npm publish --access public
+
+  publish-github:
+    needs: publish-npm
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+          registry-url: https://npm.pkg.github.com
+          scope: '@mr-anton-t'
+
+      - run: npm ci
+
+      - name: Publish to GitHub Packages
+        run: |
+          npm pkg set name="@mr-anton-t/eslint-rule-specific-fix"
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
