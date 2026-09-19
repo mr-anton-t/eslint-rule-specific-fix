@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createRequire } from 'node:module';
+import { text } from 'node:stream/consumers';
 import {
     expandFilesWithExtensions,
     parseExtensions,
@@ -113,13 +114,7 @@ export function parseArguments(args) {
 }
 
 async function readStdinFiles() {
-    let text = '';
-
-    for await (const chunk of process.stdin) {
-        text += chunk;
-    }
-
-    return parseStdinFileList(text);
+    return parseStdinFileList(await text(process.stdin));
 }
 
 async function main() {

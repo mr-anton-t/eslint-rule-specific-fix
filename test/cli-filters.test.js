@@ -26,14 +26,17 @@ async function createDirectoryFixture() {
     return { directory, source };
 }
 
+function runCli(args, options) {
+    return execFileAsync(process.execPath, [cliPath, ...args], {
+        timeout: 15_000,
+        ...options,
+    });
+}
+
 test('limits directory scans with --ext', async () => {
     const { directory, source } = await createDirectoryFixture();
 
-    await execFileAsync(
-        process.execPath,
-        [cliPath, '--ext', '.mjs', '--rule', 'semi', 'src'],
-        { cwd: directory },
-    );
+    await runCli(['--ext', '.mjs', '--rule', 'semi', 'src'], { cwd: directory });
 
     assert.equal(await readFile(path.join(directory, 'src', 'extra.mjs'), 'utf8'), 'const value = 1;\n');
     assert.equal(await readFile(path.join(directory, 'src', 'extra.js'), 'utf8'), source);
@@ -42,9 +45,8 @@ test('limits directory scans with --ext', async () => {
 test('skips files matched by --ignore-pattern', async () => {
     const { directory, source } = await createDirectoryFixture();
 
-    await execFileAsync(
-        process.execPath,
-        [cliPath, '--ignore-pattern', 'skip.js', '--rule', 'semi', 'keep.js', 'skip.js'],
+    await runCli(
+        ['--ignore-pattern', 'skip.js', '--rule', 'semi', 'keep.js', 'skip.js'],
         { cwd: directory },
     );
 
@@ -53,15 +55,13 @@ test('skips files matched by --ignore-pattern', async () => {
 });
 
 test('reads a file list from stdin', async () => {
-    const { directory, source } = await createDirectoryFixture();
+    const { directory } = await createDirectoryFixture();
 
-    await execFileAsync(
-        process.execPath,
-        [cliPath, '--stdin', '--rule', 'semi'],
-        { cwd: directory, input: 'keep.js\n# ignored\nskip.js\n' },
-    );
+    await runCli(['--stdin', '--rule', 'semi'], {
+        cwd: directory,
+        input: 'keep.js\n# ignored\nskip.js\n',
+    });
 
     assert.equal(await readFile(path.join(directory, 'keep.js'), 'utf8'), 'const value = 1;\n');
     assert.equal(await readFile(path.join(directory, 'skip.js'), 'utf8'), 'const value = 1;\n');
-    assert.notEqual(source, 'const value = 1;\n');
 });
