@@ -31,11 +31,11 @@ Options:
   -v, --version                 Show the package version
   --                            Treat all remaining arguments as file patterns`;
 
-function readOptionValue(argument, args, index) {
+function readOptionValue(argument, args, index, noun = 'a value') {
     const value = args[index];
 
     if (!value || value.startsWith('-')) {
-        throw new Error(`${argument} requires a value`);
+        throw new Error(`${argument} requires ${noun}`);
     }
 
     return value;
@@ -59,7 +59,7 @@ export function parseArguments(args) {
         } else if (argument === '--') {
             positionalOnly = true;
         } else if (argument === '--rule' || argument === '-r') {
-            rules.add(readOptionValue(argument, args, ++index));
+            rules.add(readOptionValue(argument, args, ++index, 'a rule ID'));
         } else if (argument.startsWith('--rule=')) {
             const rule = argument.slice('--rule='.length);
 

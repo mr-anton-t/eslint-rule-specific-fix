@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -33,6 +33,34 @@ function runCli(args, options) {
     });
 }
 
+function runCliWithStdin(args, input, cwd) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, [cliPath, ...args], { cwd });
+        let stdout = '';
+        let stderr = '';
+        const timer = setTimeout(() => {
+            child.kill('SIGKILL');
+            reject(new Error('CLI stdin test timed out'));
+        }, 15_000);
+
+        child.stdout.on('data', chunk => {
+            stdout += chunk;
+        });
+        child.stderr.on('data', chunk => {
+            stderr += chunk;
+        });
+        child.on('error', error => {
+            clearTimeout(timer);
+            reject(error);
+        });
+        child.on('close', code => {
+            clearTimeout(timer);
+            resolve({ code, stdout, stderr });
+        });
+        child.stdin.end(input);
+    });
+}
+
 test('limits directory scans with --ext', async () => {
     const { directory, source } = await createDirectoryFixture();
 
@@ -56,12 +84,13 @@ test('skips files matched by --ignore-pattern', async () => {
 
 test('reads a file list from stdin', async () => {
     const { directory } = await createDirectoryFixture();
+    const result = await runCliWithStdin(
+        ['--stdin', '--rule', 'semi'],
+        'keep.js\n# ignored\nskip.js\n',
+        directory,
+    );
 
-    await runCli(['--stdin', '--rule', 'semi'], {
-        cwd: directory,
-        input: 'keep.js\n# ignored\nskip.js\n',
-    });
-
+    assert.equal(result.code, 0);
     assert.equal(await readFile(path.join(directory, 'keep.js'), 'utf8'), 'const value = 1;\n');
     assert.equal(await readFile(path.join(directory, 'skip.js'), 'utf8'), 'const value = 1;\n');
 });
