@@ -1,0 +1,55 @@
+name: Bump Version
+
+# Every merged pull request increments the patch version on main. This workflow
+# only checks out the trusted default branch and never executes pull request code.
+# Commits made by GITHUB_TOKEN do not start another run, preventing bump loops.
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - closed
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    if: ${{ github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Increment and commit patch version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git checkout -B version-bump origin/main
+            npm version patch --no-git-tag-version --ignore-scripts
+            version=$(node --print "require('./package.json').version")
+
+            git add package.json package-lock.json
+            git commit -m "chore: bump version to $version [skip ci]"
+
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+
+            echo "main changed during attempt $attempt; retrying with the latest version."
+            sleep $((attempt * 2))
+          done
+
+          echo "Unable to push the version bump after 5 attempts."
+          exit 1
