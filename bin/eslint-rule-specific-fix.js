@@ -113,13 +113,13 @@ export function parseArguments(args) {
 }
 
 async function readStdinFiles() {
-    const chunks = [];
+    let text = '';
 
     for await (const chunk of process.stdin) {
-        chunks.push(chunk);
+        text += chunk;
     }
 
-    return parseStdinFileList(Buffer.concat(chunks).toString('utf8'));
+    return parseStdinFileList(text);
 }
 
 async function main() {
