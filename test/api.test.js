@@ -30,6 +30,8 @@ test('fixRules applies only selected-rule fixes and returns a report', async () 
 
     assert.equal(report.exitCode, 0);
     assert.deepEqual(report.rules, ['semi']);
+    assert.equal(report.summary.written, true);
+    assert.equal(report.summary.changedFileCount, 1);
     assert.equal(
         await readFile(path.join(directory, 'fixture.js'), 'utf8'),
         'const value = "text";\n',
@@ -59,6 +61,24 @@ test('fixRules rejects invalid and empty file patterns', async () => {
         fixRules([null], { rules: ['semi'] }),
         /At least one file pattern is required/,
     );
+});
+
+test('fixRules can compute fixes without writing files', async () => {
+    const source = 'const value = "text"\n';
+    const directory = await createFixture(source, {
+        semi: ['error', 'always'],
+    });
+
+    const report = await fixRules(['fixture.js'], {
+        rules: 'semi',
+        cwd: directory,
+        write: false,
+    });
+
+    assert.equal(report.exitCode, 0);
+    assert.equal(report.summary.written, false);
+    assert.equal(report.summary.changedFileCount, 1);
+    assert.equal(await readFile(path.join(directory, 'fixture.js'), 'utf8'), source);
 });
 
 test('fixRules reports remaining selected-rule violations', async () => {
