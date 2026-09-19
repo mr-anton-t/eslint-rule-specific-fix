@@ -50,7 +50,7 @@ test('fixRules accepts a single rule string', async () => {
     assert.deepEqual(report.rules, ['semi']);
 });
 
-test('fixRules rejects empty file patterns and character-split rules', async () => {
+test('fixRules rejects invalid and empty file patterns', async () => {
     await assert.rejects(
         fixRules(undefined, { rules: ['semi'] }),
         /At least one file pattern is required/,
