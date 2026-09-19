@@ -6,7 +6,6 @@ import path from 'node:path';
 import { clearTimeout, setTimeout } from 'node:timers';
 import { promisify } from 'node:util';
 import test from 'node:test';
-import { parseArguments } from '../bin/eslint-rule-specific-fix.js';
 
 const execFileAsync = promisify(execFile);
 const cliPath = path.resolve('bin/eslint-rule-specific-fix.js');
@@ -121,11 +120,29 @@ test('reads a file list from the - file argument', async () => {
     assert.equal(await readFile(path.join(directory, 'keep.js'), 'utf8'), 'const value = 1;\n');
 });
 
-test('rejects empty equals-form option values', () => {
-    assert.throws(() => parseArguments(['--rule=', 'src']), /--rule requires a rule ID/);
-    assert.throws(() => parseArguments(['--rule', 'semi', '--ext=']), /--ext requires a value/);
-    assert.throws(
-        () => parseArguments(['--rule', 'semi', '--ignore-pattern=', 'src']),
-        /--ignore-pattern requires a value/,
+test('rejects empty equals-form option values', async () => {
+    await assert.rejects(
+        runCli(['--rule=', 'src']),
+        error => {
+            assert.equal(error.code, 2);
+            assert.match(error.stderr, /--rule requires a rule ID/);
+            return true;
+        },
+    );
+    await assert.rejects(
+        runCli(['--rule', 'semi', '--ext=']),
+        error => {
+            assert.equal(error.code, 2);
+            assert.match(error.stderr, /--ext requires a value/);
+            return true;
+        },
+    );
+    await assert.rejects(
+        runCli(['--rule', 'semi', '--ignore-pattern=', 'src']),
+        error => {
+            assert.equal(error.code, 2);
+            assert.match(error.stderr, /--ignore-pattern requires a value/);
+            return true;
+        },
     );
 });
