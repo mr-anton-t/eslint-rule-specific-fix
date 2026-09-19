@@ -222,3 +222,38 @@ test('explains when a flat config file is missing', async () => {
         },
     );
 });
+
+test('does not write files in dry-run mode', async () => {
+    const source = 'const value = "text"\n';
+    const directory = await createFixture(source, {
+        semi: ['error', 'always'],
+    });
+
+    const result = await execFileAsync(
+        process.execPath,
+        [cliPath, '--dry-run', '--rule', 'semi', 'fixture.js'],
+        { cwd: directory },
+    );
+
+    assert.equal(result.stdout, '');
+    assert.equal(await readFile(path.join(directory, 'fixture.js'), 'utf8'), source);
+});
+
+test('prints a JSON summary', async () => {
+    const directory = await createFixture('const value = "text"\n', {
+        semi: ['error', 'always'],
+    });
+
+    const result = await execFileAsync(
+        process.execPath,
+        [cliPath, '--dry-run', '--json', '--rule', 'semi', 'fixture.js'],
+        { cwd: directory },
+    );
+
+    assert.deepEqual(JSON.parse(result.stdout), {
+        written: false,
+        changedFileCount: 1,
+        remainingSelectedCount: 0,
+        fatalCount: 0,
+    });
+});

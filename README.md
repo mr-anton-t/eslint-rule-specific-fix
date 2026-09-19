@@ -44,6 +44,22 @@ npx eslint-rule-specific-fix -r semi --rule=quotes "src/**/*.js"
 
 Use `--` before a file pattern beginning with a hyphen.
 
+`--dry-run` computes the same selected-rule fixes without writing files.
+`--json` prints a machine-readable summary to stdout:
+
+```sh
+npx eslint-rule-specific-fix --dry-run --json --rule semi src
+```
+
+```json
+{
+  "written": false,
+  "changedFileCount": 1,
+  "remainingSelectedCount": 0,
+  "fatalCount": 0
+}
+```
+
 ## JS API
 
 The same selected-rule fixer can be called from Node.js. It uses the ESLint
@@ -55,11 +71,10 @@ import { fixRules } from 'eslint-rule-specific-fix';
 const report = await fixRules(['src/**/*.js'], {
   rules: ['semi', 'quotes'],
   cwd: process.cwd(),
+  write: false,
 });
 
-if (report.exitCode !== 0) {
-  console.error(report.reportableResults);
-}
+console.log(report.summary);
 ```
 
 `report.exitCode` uses the same 0/1/2 meanings as the CLI. Pass `eslintOptions`
@@ -74,6 +89,7 @@ through to the `ESLint` constructor when you need a custom config file or cwd.
 | `2` | Invalid arguments or an ESLint/runtime error |
 
 Violations from rules not passed to `--rule` do not affect the exit code.
+`--dry-run` uses the same codes; it only skips writing files.
 
 ## Development
 
