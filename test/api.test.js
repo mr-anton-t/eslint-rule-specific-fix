@@ -117,6 +117,14 @@ test('expands existing dotted directories for --ext', async () => {
     );
 });
 
+test('preserves existing extensionless files for --ext', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'eslint-rule-specific-fix-makefile-'));
+    const makefile = path.join(directory, 'Makefile');
+    await writeFile(makefile, 'all:\n');
+
+    assert.deepEqual(expandFilesWithExtensions([makefile], ['.js']), [makefile]);
+});
+
 test('fixRules reports remaining selected-rule violations', async () => {
     const directory = await createFixture('debugger;\n', {
         'no-debugger': 'error',
