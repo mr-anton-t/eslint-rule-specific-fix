@@ -16,6 +16,8 @@ Apply ESLint fixes only for the specified rules.
 
 Options:
   -r, --rule <rule>  Rule ID whose fixes may be applied (repeatable)
+      --dry-run      Compute fixes without writing files
+      --json         Print a JSON summary to stdout
   -h, --help         Show this help
   -v, --version      Show the package version
   --                 Treat all remaining arguments as file patterns`;
@@ -24,6 +26,8 @@ export function parseArguments(args) {
     const rules = new Set();
     const files = [];
     let positionalOnly = false;
+    let dryRun = false;
+    let json = false;
 
     for (let index = 0; index < args.length; index++) {
         const argument = args[index];
@@ -48,6 +52,10 @@ export function parseArguments(args) {
             }
 
             rules.add(rule);
+        } else if (argument === '--dry-run') {
+            dryRun = true;
+        } else if (argument === '--json') {
+            json = true;
         } else if (argument === '--help' || argument === '-h') {
             return { action: 'help' };
         } else if (argument === '--version' || argument === '-v') {
@@ -63,7 +71,7 @@ export function parseArguments(args) {
         throw new Error('At least one rule and one file pattern are required');
     }
 
-    return { action: 'lint', files, rules };
+    return { action: 'lint', files, rules, dryRun, json };
 }
 
 async function main() {
@@ -88,9 +96,14 @@ async function main() {
         return;
     }
 
-    const report = await fixRules(options.files, { rules: options.rules });
+    const report = await fixRules(options.files, {
+        rules: options.rules,
+        write: !options.dryRun,
+    });
 
-    if (report.reportableResults.length > 0) {
+    if (options.json) {
+        console.log(JSON.stringify(report.summary, null, 2));
+    } else if (report.reportableResults.length > 0) {
         const { ESLint } = await import('eslint');
         const eslint = new ESLint();
         const formatter = await eslint.loadFormatter('stylish');
