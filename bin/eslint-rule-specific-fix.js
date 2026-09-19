@@ -25,6 +25,7 @@ Options:
       --ext <ext[,ext]>         Limit directory scans to these extensions
       --ignore-pattern <glob>   Extra ignore glob (repeatable)
       --stdin                   Read a newline-separated file list from stdin
+      -                         Same as --stdin when used as a file argument
       --dry-run                 Compute fixes without writing files
       --json                    Print a JSON summary to stdout
   -h, --help                    Show this help
@@ -36,6 +37,16 @@ function readOptionValue(argument, args, index, noun = 'a value') {
 
     if (!value || value.startsWith('-')) {
         throw new Error(`${argument} requires ${noun}`);
+    }
+
+    return value;
+}
+
+function readEqualsValue(argument, prefix, noun = 'a value') {
+    const value = argument.slice(prefix.length);
+
+    if (!value) {
+        throw new Error(`${prefix.slice(0, -1)} requires ${noun}`);
     }
 
     return value;
@@ -61,21 +72,15 @@ export function parseArguments(args) {
         } else if (argument === '--rule' || argument === '-r') {
             rules.add(readOptionValue(argument, args, ++index, 'a rule ID'));
         } else if (argument.startsWith('--rule=')) {
-            const rule = argument.slice('--rule='.length);
-
-            if (!rule) {
-                throw new Error('--rule requires a rule ID');
-            }
-
-            rules.add(rule);
+            rules.add(readEqualsValue(argument, '--rule=', 'a rule ID'));
         } else if (argument === '--ext') {
             extensions.push(readOptionValue(argument, args, ++index));
         } else if (argument.startsWith('--ext=')) {
-            extensions.push(argument.slice('--ext='.length));
+            extensions.push(readEqualsValue(argument, '--ext='));
         } else if (argument === '--ignore-pattern') {
             ignorePatterns.push(readOptionValue(argument, args, ++index));
         } else if (argument.startsWith('--ignore-pattern=')) {
-            ignorePatterns.push(argument.slice('--ignore-pattern='.length));
+            ignorePatterns.push(readEqualsValue(argument, '--ignore-pattern='));
         } else if (argument === '--stdin') {
             stdin = true;
         } else if (argument === '--dry-run') {
@@ -86,6 +91,8 @@ export function parseArguments(args) {
             return { action: 'help' };
         } else if (argument === '--version' || argument === '-v') {
             return { action: 'version' };
+        } else if (argument === '-') {
+            files.push(argument);
         } else if (argument.startsWith('-')) {
             throw new Error(`Unknown option: ${argument}`);
         } else {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -104,6 +104,17 @@ test('parses extension and stdin file lists', () => {
     assert.deepEqual(parseExtensions(['js,.mjs', '.cjs']), ['.js', '.mjs', '.cjs']);
     assert.deepEqual(expandFilesWithExtensions(['src'], ['.js', '.mjs']), ['src/**/*{.js,.mjs}']);
     assert.deepEqual(parseStdinFileList('a.js\n# comment\n\nb.js\n'), ['a.js', 'b.js']);
+});
+
+test('expands existing dotted directories for --ext', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'eslint-rule-specific-fix-ext-'));
+    const dotted = path.join(directory, 'src.v1');
+    await mkdir(dotted);
+
+    assert.deepEqual(
+        expandFilesWithExtensions([dotted], ['.js']),
+        [`${dotted}/**/*.js`],
+    );
 });
 
 test('fixRules reports remaining selected-rule violations', async () => {

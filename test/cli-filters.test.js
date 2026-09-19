@@ -6,6 +6,7 @@ import path from 'node:path';
 import { clearTimeout, setTimeout } from 'node:timers';
 import { promisify } from 'node:util';
 import test from 'node:test';
+import { parseArguments } from '../bin/eslint-rule-specific-fix.js';
 
 const execFileAsync = promisify(execFile);
 const cliPath = path.resolve('bin/eslint-rule-specific-fix.js');
@@ -23,6 +24,9 @@ async function createDirectoryFixture() {
     await mkdir(path.join(directory, 'src'));
     await writeFile(path.join(directory, 'src', 'extra.mjs'), source);
     await writeFile(path.join(directory, 'src', 'extra.js'), source);
+    await mkdir(path.join(directory, 'src.v1'));
+    await writeFile(path.join(directory, 'src.v1', 'nested.js'), source);
+    await writeFile(path.join(directory, 'src.v1', 'nested.mjs'), source);
 
     return { directory, source };
 }
@@ -71,6 +75,15 @@ test('limits directory scans with --ext', async () => {
     assert.equal(await readFile(path.join(directory, 'src', 'extra.js'), 'utf8'), source);
 });
 
+test('expands dotted directories with --ext', async () => {
+    const { directory, source } = await createDirectoryFixture();
+
+    await runCli(['--ext', '.js', '--rule', 'semi', 'src.v1'], { cwd: directory });
+
+    assert.equal(await readFile(path.join(directory, 'src.v1', 'nested.js'), 'utf8'), 'const value = 1;\n');
+    assert.equal(await readFile(path.join(directory, 'src.v1', 'nested.mjs'), 'utf8'), source);
+});
+
 test('skips files matched by --ignore-pattern', async () => {
     const { directory, source } = await createDirectoryFixture();
 
@@ -94,4 +107,25 @@ test('reads a file list from stdin', async () => {
     assert.equal(result.code, 0);
     assert.equal(await readFile(path.join(directory, 'keep.js'), 'utf8'), 'const value = 1;\n');
     assert.equal(await readFile(path.join(directory, 'skip.js'), 'utf8'), 'const value = 1;\n');
+});
+
+test('reads a file list from the - file argument', async () => {
+    const { directory } = await createDirectoryFixture();
+    const result = await runCliWithStdin(
+        ['--rule', 'semi', '-'],
+        'keep.js\n',
+        directory,
+    );
+
+    assert.equal(result.code, 0);
+    assert.equal(await readFile(path.join(directory, 'keep.js'), 'utf8'), 'const value = 1;\n');
+});
+
+test('rejects empty equals-form option values', () => {
+    assert.throws(() => parseArguments(['--rule=', 'src']), /--rule requires a rule ID/);
+    assert.throws(() => parseArguments(['--rule', 'semi', '--ext=']), /--ext requires a value/);
+    assert.throws(
+        () => parseArguments(['--rule', 'semi', '--ignore-pattern=', 'src']),
+        /--ignore-pattern requires a value/,
+    );
 });
